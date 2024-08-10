@@ -1,52 +1,43 @@
-name: Flutter Multi-Platform Build
+name: iOS-ipa-build
 
 on:
   workflow_dispatch:
 
 jobs:
-  # Build Android APK and AAB
-  build-android:
-    name: 🚀 Android Build
-    runs-on: ubuntu-latest
+  build-ios:
+    name: 🎉 iOS Build
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
 
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-
+          architecture: x64
       - run: flutter clean
       - run: flutter pub get
-
-      # Build APK for all architectures
-      - run: flutter build apk --release --split-per-abi
       
-      # Build AAB
-      - run: flutter build appbundle --release
 
-      # Debug: List build outputs
-      - run: |
-          echo "Listing APK files:"
-          ls -la build/app/outputs/flutter-apk/
-          echo "Listing AAB files:"
-          ls -la build/app/outputs/bundle/release/
+      - run: pod repo update
+        working-directory: ios
 
-      # Upload APKs
-      - name: Upload APKs to release
+      - run: flutter build ios --release --no-codesign
+
+      - run: mkdir Payload
+        working-directory: build/ios/iphoneos
+
+      - run: mv Runner.app/ Payload
+        working-directory: build/ios/iphoneos
+
+      - name: Zip output
+        run: zip -qq -r -9 FlutterIpaExport.ipa Payload
+        working-directory: build/ios/iphoneos
+
+      - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/app/outputs/flutter-apk/*.apk
+          file: build/ios/iphoneos/FlutterIpaExport.ipa
           tag: v1.0
           overwrite: true
-          body: "Android APKs (all architectures) for this release."
-
-      # Upload AAB
-      - name: Upload AAB to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/app/outputs/bundle/release/*.aab
-          tag: v1.0
-          overwrite: true
-          body: "Android AAB for this release."
+          body: "This is first release"
