@@ -1,9 +1,63 @@
-name: iOS-ipa-build
+name: Flutter Multi-Platform Build
 
 on:
   workflow_dispatch:
 
 jobs:
+  # Build Android APK, AAB, and AAR
+  build-android:
+    name: 🚀 Android Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - run: flutter clean
+      - run: flutter pub get
+
+      # Build APK for all architectures
+      - run: flutter build apk --release --split-per-abi
+      
+      # Build AAB
+      - run: flutter build appbundle --release
+
+      # Build AAR
+      - run: flutter build aar
+
+      # Upload APKs
+      - name: Upload APKs to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/app/outputs/flutter-apk/*.apk
+          tag: v1.0
+          overwrite: true
+          body: "Android APKs (all architectures) for this release."
+
+      # Upload AAB
+      - name: Upload AAB to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/app/outputs/bundle/release/*.aab
+          tag: v1.0
+          overwrite: true
+          body: "Android AAB for this release."
+
+      # Upload AAR
+      - name: Upload AAR to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/host/outputs/repo/*.aar
+          tag: v1.0
+          overwrite: true
+          body: "Android AAR for this release."
+
+  # Build iOS IPA
   build-ios:
     name: 🎉 iOS Build
     runs-on: macos-latest
@@ -14,9 +68,9 @@ jobs:
         with:
           channel: 'stable'
           architecture: x64
+
       - run: flutter clean
       - run: flutter pub get
-      
 
       - run: pod repo update
         working-directory: ios
@@ -33,11 +87,41 @@ jobs:
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
-      - name: Upload binaries to release
+      - name: Upload IPA to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/ios/iphoneos/FlutterIpaExport.ipa
           tag: v1.0
           overwrite: true
-          body: "This is first release"
+          body: "iOS IPA for this release."
+
+  # Build Web
+  build-web:
+    name: 🌐 Web Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - run: flutter clean
+      - run: flutter pub get
+
+      - run: flutter build web --release
+
+      - name: Upload Web Build to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/web-release.zip
+          tag: v1.0
+          overwrite: true
+          body: "Web assets for this release."
+        env:
+          ZIP_FOLDER: build/web
+
+      - name: Zip Web Build
+        run: zip -r build/web-release.zip build/web
